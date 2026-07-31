@@ -2,7 +2,7 @@
 
 A frosted-glass ("Liquid Glass") weather widget for Home Assistant Lovelace dashboards. Shows current conditions, an animated weather scene, a live clock, and a multi-day forecast with min/max temperature bars — all in a translucent, iOS-style glass panel.
 
-![Weather Glass Card preview](https://raw.githubusercontent.com/donsebby/weather-glass-card/main/preview.png)
+![demo](asset/weather-glass-card.png)
 
 ## Features
 
