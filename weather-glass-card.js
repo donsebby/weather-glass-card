@@ -1,8 +1,21 @@
 /* Weather Glass Card - frosted-glass weather widget for Home Assistant
+ * Design von Sebbo.
+ *
+ * v1.2.0:
+ * - Optional warning badge(s) next to the clock via `warning_entity`
+ *   (single) or `warnings: [{entity, icon, color, navigate}, ...]` (multiple).
+ * - UV-index and pollen chips, kept visually separate from the warning
+ *   badges. UV reads `uv_index` straight off the weather entity - no extra
+ *   sensor needed. Pollen shows the strongest active type from
+ *   `pollen_entities: [{entity, label}, ...]`.
+ * - Chips are tappable - each navigates to its own pop-up (default
+ *   "#uv-popup" / "#pollen-popup") instead of the card's default more-info
+ *   action.
+ *
  * type: custom:weather-glass-card
  * MIT
  */
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.2.0";
 
 const DAYS = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 const DAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
@@ -52,6 +65,19 @@ const TRAITS = {
 // variant so the hero icon doesn't show a bright sun/blue sky at 2am.
 const NIGHT_VARIANT = { sunny: "clear-night", partlycloudy: "partlycloudy-night" };
 
+// UV index category labels (WHO scale)
+function uvLabel(v) {
+  if (v == null || isNaN(v)) return null;
+  if (v < 3) return "Niedrig";
+  if (v < 6) return "Mäßig";
+  if (v < 8) return "Hoch";
+  if (v < 11) return "Sehr hoch";
+  return "Extrem";
+}
+
+// Pollenflug-style Gefahrenindex (0-3) category labels
+const POLLEN_LEVEL = ["Keine", "Gering", "Mittel", "Hoch"];
+
 class WeatherGlassCard extends HTMLElement {
   static getStubConfig() {
     return { entity: "weather.forecast_home", days: 5 };
@@ -67,16 +93,23 @@ class WeatherGlassCard extends HTMLElement {
         { name: "animations", selector: { boolean: {} } },
         { name: "blur", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
         { name: "panel_shade", selector: { number: { min: -100, max: 100, step: 5, mode: "slider", unit_of_measurement: "%" } } },
+        { name: "show_uv", selector: { boolean: {} } },
+        { name: "uv_navigate", selector: { text: {} } },
+        { name: "pollen_navigate", selector: { text: {} } },
         { name: "warning_entity", selector: { entity: { domain: "binary_sensor" } } },
         { name: "warning_icon", selector: { icon: {} } },
         { name: "warning_color", selector: { text: {} } },
         { name: "warning_navigate", selector: { text: {} } }
       ],
       // Note: additional warning badges beyond `warning_entity` (e.g. a
-      // second, differently colored one for a more urgent condition) are
-      // configured via the `warnings: [{entity, icon, color, navigate}, ...]`
-      // array, which has no GUI editor yet - add those entries in YAML/code
-      // mode.
+      // second, more urgent one for lightning) are configured via the
+      // `warnings: [{entity, icon, color, navigate}, ...]` array, which has
+      // no GUI editor yet - add those entries directly in YAML/code mode.
+      // Same for `pollen_entities: [{entity, label}, ...]` - the chip row
+      // showing UV index + strongest active pollen type, kept deliberately
+      // separate from the warning badges (UV/pollen are everyday info, not
+      // alerts). UV reads `uv_index` straight off the weather entity, so it
+      // needs no entity of its own - just toggle it with `show_uv`.
       computeLabel: (s) => ({
         entity: "Weather entity",
         name: "Title (defaults to friendly name)",
@@ -85,6 +118,9 @@ class WeatherGlassCard extends HTMLElement {
         animations: "Animated weather scene",
         blur: "Backdrop blur",
         panel_shade: "Panel brightness",
+        show_uv: "Show UV index chip",
+        uv_navigate: "UV chip tap navigation path",
+        pollen_navigate: "Pollen chip tap navigation path",
         warning_entity: "Warning entity (optional binary_sensor)",
         warning_icon: "Warning icon (defaults to mdi:alert)",
         warning_color: "Warning icon color",
@@ -101,12 +137,21 @@ class WeatherGlassCard extends HTMLElement {
     this._anim = config.animations !== false;
     this._blur = config.blur ?? 20;
     this._panelShade = config.panel_shade ?? 6;
+    this._showUv = config.show_uv !== false;
+    this._pollen = Array.isArray(config.pollen_entities)
+      ? config.pollen_entities.filter((p) => p && p.entity)
+      : [];
+    // Tapping the UV chip or the pollen chip navigates to its own hash
+    // instead of triggering the card's default more-info action - same
+    // navigate-by-hash mechanism the warning badges use, so each can open
+    // its own bubble-card pop-up with a fuller breakdown.
+    this._uvNavigate = config.uv_navigate || "#uv-popup";
+    this._pollenNavigate = config.pollen_navigate || "#pollen-popup";
     // One or more small warning badges, rendered left-to-right next to the
     // clock. `warning_entity`/`warning_icon`/`warning_color`/`warning_navigate`
     // stay as the simple single-badge shorthand (GUI-editable); `warnings: []`
-    // is the escape hatch for extra badges (e.g. a second, differently
-    // colored one for a more urgent condition) - no GUI editor for that one
-    // yet, YAML/code mode only.
+    // is the escape hatch for extra badges (e.g. a second, more urgent one
+    // for lightning) - no GUI editor for that one yet, YAML/code mode only.
     const warnList = [];
     if (config.warning_entity) warnList.push({
       entity: config.warning_entity,
@@ -183,6 +228,12 @@ class WeatherGlassCard extends HTMLElement {
       .cond { color:rgba(255,255,255,.72); font-size:14px; font-weight:600; margin-top:6px; }
       .hl { display:flex; align-items:center; gap:10px; color:rgba(255,255,255,.5); font-size:12px; font-weight:600; margin-top:6px; font-variant-numeric:tabular-nums; }
       .hl span.sep { width:1px; height:10px; background:rgba(255,255,255,.2); }
+      .chips { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+      .chip { display:flex; align-items:center; gap:6px; padding:5px 10px; border-radius:10px; cursor:pointer;
+        background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10); transition:background .2s ease; }
+      .chip:hover { background:rgba(255,255,255,.14); }
+      .chip ha-icon { --mdc-icon-size:14px; color:rgba(255,255,255,.75); }
+      .chip span { color:rgba(255,255,255,.85); font-size:11.5px; font-weight:600; white-space:nowrap; }
       .scene { position:relative; width:112px; height:104px; flex:0 0 auto; }
       .sun { position:absolute; top:10px; right:14px; width:56px; height:56px; }
       .sun .halo { position:absolute; inset:-18px; border-radius:50%; background:radial-gradient(circle, rgba(255,196,92,.55), transparent 68%); animation:wgc-halo 5s ease-in-out infinite; }
@@ -254,6 +305,22 @@ class WeatherGlassCard extends HTMLElement {
     this._inner = this._card.querySelector(".inner");
     this._canvas = this._card.querySelector("canvas");
 
+    // Delegated click handler for the UV/pollen chips - delegated because
+    // .inner's innerHTML (and therefore the chip nodes) gets rebuilt on
+    // every _render(). Stops propagation so the card's own click listener
+    // (which opens the weather entity's more-info dialog) doesn't also
+    // fire - tapping a chip should only navigate to its own pop-up. Each
+    // chip carries data-popup="uv"|"pollen" (see _render()) so the two
+    // chips can point at two different hashes.
+    this._inner.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      e.stopPropagation();
+      const hash = chip.dataset.popup === "pollen" ? this._pollenNavigate : this._uvNavigate;
+      history.pushState(null, "", hash);
+      window.dispatchEvent(new CustomEvent("location-changed", { bubbles: true, composed: true }));
+    });
+
     // optional warning badges - one per entry in this._warnings, each shown
     // when its entity is "on". They live as persistent, detached nodes
     // re-parented into the ".warn-slots" placeholder next to the clock on
@@ -262,8 +329,11 @@ class WeatherGlassCard extends HTMLElement {
     // .inner's innerHTML rebuilds.
     // Tapping one does NOT open the weather entity's more-info dialog (that's
     // the card's own default tap action) - it navigates like a Lovelace
-    // tap_action: navigate would, so it can be wired to a dashboard's own
-    // warnings popup.
+    // tap_action: navigate would, so it can reuse the exact same warnings
+    // popup the "Wetter" badge already opens.
+    // Note: UV/pollen are deliberately NOT in this list - they're everyday
+    // info, not alerts, so they render as plain ".chip" elements inside
+    // innerHTML instead (see _render()), with no pulse/click behaviour.
     this._warnBadges = this._warnings.map((w) => {
       const el = document.createElement("div");
       el.className = "warn-badge";
@@ -427,18 +497,39 @@ class WeatherGlassCard extends HTMLElement {
     const hi = today.temperature != null ? Math.round(today.temperature) : null;
     const lo = today.templow != null ? Math.round(today.templow) : null;
 
-    // Home Assistant pushes a fresh `hass` object (and therefore calls this
-    // setter) far more often than the weather entity itself actually changes
-    // - e.g. whenever any other unrelated entity on the dashboard updates.
-    // Rebuilding .inner's innerHTML on every one of those pushes destroys
-    // and recreates the scene icons (sun/cloud/bolt/fog), which restarts
-    // their CSS keyframe animations from frame zero each time - that's the
-    // "twitch/stutter" (zucken) users see. So: only rebuild the DOM when
-    // something we actually display has changed.
     const curTemp = st.attributes.temperature != null ? Math.round(st.attributes.temperature) : null;
     const humidity = st.attributes.humidity != null ? Math.round(st.attributes.humidity) : null;
+
+    // UV index comes straight off the weather entity - no separate sensor
+    // needed. Rounded to 1 decimal so e.g. 6.4 doesn't get lost to Math.round.
+    const uvVal = this._showUv && st.attributes.uv_index != null
+      ? Math.round(st.attributes.uv_index * 10) / 10 : null;
+
+    // Strongest currently-active pollen type among the configured entities
+    // (Pollenflug-style Gefahrenindex 0-3 scale). Shows nothing if the list
+    // is empty or every entity is unavailable/NaN.
+    let pollenBest = null;
+    for (const p of this._pollen) {
+      const pst = this._hass.states[p.entity];
+      if (!pst) continue;
+      const val = parseFloat(pst.state);
+      if (isNaN(val)) continue;
+      if (!pollenBest || val > pollenBest.val) {
+        pollenBest = { val, label: p.label || (pst.attributes && pst.attributes.friendly_name) || p.entity };
+      }
+    }
+
+    const chips = [];
+    if (uvVal != null) chips.push(
+      `<div class="chip" data-popup="uv"><ha-icon icon="mdi:weather-sunny"></ha-icon><span>UV ${uvVal} · ${uvLabel(uvVal)}</span></div>`
+    );
+    if (pollenBest && pollenBest.val > 0) chips.push(
+      `<div class="chip" data-popup="pollen"><ha-icon icon="mdi:flower-pollen"></ha-icon><span>${pollenBest.label} · ${POLLEN_LEVEL[Math.min(3, Math.max(0, Math.round(pollenBest.val)))]}</span></div>`
+    );
+    const chipsHtml = chips.length ? `<div class="chips">${chips.join("")}</div>` : "";
+
     const fcSig = fc.map((d) => d.datetime + "|" + d.condition + "|" + (d.temperature != null ? Math.round(d.temperature) : "x") + "|" + (d.templow != null ? Math.round(d.templow) : "x")).join(",");
-    const sig = [state, isNight, curTemp, humidity, unit, this._config.name || "", now.getDate(), fcSig].join("::");
+    const sig = [state, isNight, curTemp, humidity, unit, this._config.name || "", now.getDate(), fcSig, uvVal, pollenBest ? pollenBest.val : "x"].join("::");
     if (sig === this._lastSig) return;
     this._lastSig = sig;
 
@@ -490,6 +581,7 @@ class WeatherGlassCard extends HTMLElement {
             ${lo != null ? `<span>T ${lo}°</span>` : ""}
             ${st.attributes.humidity != null ? `<span class="sep"></span><span>${st.attributes.humidity}%</span>` : ""}
           </div>
+          ${chipsHtml}
         </div>
         <div class="scene">
           ${tr.sun ? '<div class="sun"><div class="halo"></div><div class="disc"></div></div>' : ""}
@@ -516,6 +608,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "weather-glass-card",
   name: "Weather Glass Card",
-  description: "Frosted-glass weather widget with animated conditions, clock and daily min/max forecast.",
+  description: "Frosted-glass weather widget with UV/pollen chips and optional warning badges.",
   preview: true
 });
