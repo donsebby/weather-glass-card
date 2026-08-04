@@ -2,10 +2,11 @@
  * type: custom:weather-glass-card
  * MIT
  */
+const CARD_VERSION = "1.1.0";
 
 const DAYS = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 const DAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-const MONTHS = ["Januar", "Februar", "M\u00e4rz", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
 const LABELS = {
   "clear-night": "Klare Nacht",
@@ -22,7 +23,7 @@ const LABELS = {
   sunny: "Sonnig",
   windy: "Windig",
   "windy-variant": "Windig",
-  exceptional: "Ungew\u00f6hnlich"
+  exceptional: "Ungewöhnlich"
 };
 
 // visual traits per HA weather state
@@ -65,8 +66,17 @@ class WeatherGlassCard extends HTMLElement {
         { name: "show_clock", selector: { boolean: {} } },
         { name: "animations", selector: { boolean: {} } },
         { name: "blur", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
-        { name: "panel_shade", selector: { number: { min: -100, max: 100, step: 5, mode: "slider", unit_of_measurement: "%" } } }
+        { name: "panel_shade", selector: { number: { min: -100, max: 100, step: 5, mode: "slider", unit_of_measurement: "%" } } },
+        { name: "warning_entity", selector: { entity: { domain: "binary_sensor" } } },
+        { name: "warning_icon", selector: { icon: {} } },
+        { name: "warning_color", selector: { text: {} } },
+        { name: "warning_navigate", selector: { text: {} } }
       ],
+      // Note: additional warning badges beyond `warning_entity` (e.g. a
+      // second, differently colored one for a more urgent condition) are
+      // configured via the `warnings: [{entity, icon, color, navigate}, ...]`
+      // array, which has no GUI editor yet - add those entries in YAML/code
+      // mode.
       computeLabel: (s) => ({
         entity: "Weather entity",
         name: "Title (defaults to friendly name)",
@@ -74,7 +84,11 @@ class WeatherGlassCard extends HTMLElement {
         show_clock: "Show clock & date",
         animations: "Animated weather scene",
         blur: "Backdrop blur",
-        panel_shade: "Panel brightness"
+        panel_shade: "Panel brightness",
+        warning_entity: "Warning entity (optional binary_sensor)",
+        warning_icon: "Warning icon (defaults to mdi:alert)",
+        warning_color: "Warning icon color",
+        warning_navigate: "Warning tap navigation path"
       }[s.name] || s.name)
     };
   }
@@ -87,6 +101,31 @@ class WeatherGlassCard extends HTMLElement {
     this._anim = config.animations !== false;
     this._blur = config.blur ?? 20;
     this._panelShade = config.panel_shade ?? 6;
+    // One or more small warning badges, rendered left-to-right next to the
+    // clock. `warning_entity`/`warning_icon`/`warning_color`/`warning_navigate`
+    // stay as the simple single-badge shorthand (GUI-editable); `warnings: []`
+    // is the escape hatch for extra badges (e.g. a second, differently
+    // colored one for a more urgent condition) - no GUI editor for that one
+    // yet, YAML/code mode only.
+    const warnList = [];
+    if (config.warning_entity) warnList.push({
+      entity: config.warning_entity,
+      icon: config.warning_icon || null,
+      color: config.warning_color || "#ff9800",
+      navigate: config.warning_navigate || "#warnungen-popup"
+    });
+    if (Array.isArray(config.warnings)) {
+      for (const w of config.warnings) {
+        if (!w || !w.entity) continue;
+        warnList.push({
+          entity: w.entity,
+          icon: w.icon || null,
+          color: w.color || "#ff9800",
+          navigate: w.navigate || "#warnungen-popup"
+        });
+      }
+    }
+    this._warnings = warnList;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = "";
     this._build();
@@ -184,12 +223,22 @@ class WeatherGlassCard extends HTMLElement {
       .mini .b { position:absolute; left:10px; bottom:-1px; width:8px; height:12px; background:#ffd24d;
         clip-path:polygon(58% 0%,18% 56%,46% 56%,32% 100%,82% 40%,52% 40%); animation:wgc-bolt 3s linear infinite; }
       .err { padding:20px; color:#ffb4b4; font-size:13px; }
+      .top-right { display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+      .warn-slots { display:flex; align-items:center; gap:6px; }
+      .warn-badge { width:30px; height:30px; border-radius:50%; flex:0 0 auto;
+        display:none; align-items:center; justify-content:center; cursor:pointer;
+        background:color-mix(in srgb, var(--warn-badge-color,#ff9800) 22%, transparent);
+        border:1px solid color-mix(in srgb, var(--warn-badge-color,#ff9800) 55%, transparent);
+        box-shadow:0 4px 14px -4px color-mix(in srgb, var(--warn-badge-color,#ff9800) 65%, transparent);
+        animation:wgc-warn-pulse 1.4s ease-in-out infinite; }
+      .warn-badge ha-icon { --mdc-icon-size:17px; color:var(--warn-badge-color,#ff9800); }
       @keyframes wgc-halo { 0%,100%{ transform:scale(1); opacity:.55; } 50%{ transform:scale(1.14); opacity:.9; } }
       @keyframes wgc-drift { 0%{ transform:translateX(-6px);} 50%{ transform:translateX(6px);} 100%{ transform:translateX(-6px);} }
       @keyframes wgc-fall { 0%{ transform:translateY(-6px); opacity:0;} 25%{opacity:1;} 100%{ transform:translateY(20px); opacity:0;} }
       @keyframes wgc-flake { 0%{ transform:translate(0,-4px); opacity:0;} 30%{opacity:1;} 100%{ transform:translate(4px,20px); opacity:0;} }
       @keyframes wgc-bolt { 0%,88%,100%{opacity:.25;} 90%,96%{opacity:1;} 93%{opacity:.4;} }
       @keyframes wgc-fogline { 0%,100%{ transform:translateX(-8px); opacity:.35;} 50%{ transform:translateX(8px); opacity:.85;} }
+      @keyframes wgc-warn-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.55; transform:scale(1.18); } }
       @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
     `;
     this.shadowRoot.appendChild(style);
@@ -204,6 +253,29 @@ class WeatherGlassCard extends HTMLElement {
     this._tintEl = this._card.querySelector(".tint");
     this._inner = this._card.querySelector(".inner");
     this._canvas = this._card.querySelector("canvas");
+
+    // optional warning badges - one per entry in this._warnings, each shown
+    // when its entity is "on". They live as persistent, detached nodes
+    // re-parented into the ".warn-slots" placeholder next to the clock on
+    // every full re-render (see _render()) - that keeps them in normal flex
+    // flow (no absolute-position collisions with the clock) while surviving
+    // .inner's innerHTML rebuilds.
+    // Tapping one does NOT open the weather entity's more-info dialog (that's
+    // the card's own default tap action) - it navigates like a Lovelace
+    // tap_action: navigate would, so it can be wired to a dashboard's own
+    // warnings popup.
+    this._warnBadges = this._warnings.map((w) => {
+      const el = document.createElement("div");
+      el.className = "warn-badge";
+      el.innerHTML = "<ha-icon></ha-icon>";
+      el.style.setProperty("--warn-badge-color", w.color);
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        history.pushState(null, "", w.navigate);
+        window.dispatchEvent(new CustomEvent("location-changed", { bubbles: true, composed: true }));
+      });
+      return { config: w, el };
+    });
   }
 
   /* ---------- forecast ---------- */
@@ -315,6 +387,21 @@ class WeatherGlassCard extends HTMLElement {
     const st = this._hass.states[this._config.entity];
     if (!st) { this._inner.innerHTML = `<div class="err">Entity nicht gefunden: ${this._config.entity}</div>`; this._lastSig = null; return; }
 
+    // Warning badges - updated unconditionally on every hass push (cheap:
+    // just a display/icon toggle per badge), independent of the
+    // weather-state dirty-check below, so they react immediately even when
+    // the weather itself hasn't changed.
+    for (const b of this._warnBadges) {
+      const wst = this._hass.states[b.config.entity];
+      const active = !!wst && wst.state === "on";
+      b.el.style.display = active ? "flex" : "none";
+      if (active) {
+        const icon = b.config.icon || (wst.attributes && wst.attributes.icon) || "mdi:alert";
+        const iconEl = b.el.querySelector("ha-icon");
+        if (iconEl && iconEl.getAttribute("icon") !== icon) iconEl.setAttribute("icon", icon);
+      }
+    }
+
     const state = st.state;
     const sunSt = this._hass.states["sun.sun"];
     const isNight = !!sunSt && sunSt.state === "below_horizon";
@@ -323,7 +410,7 @@ class WeatherGlassCard extends HTMLElement {
     this._traits = tr;
     this._tintEl.style.background = tr.tint;
 
-    const unit = st.attributes.temperature_unit || "\u00b0";
+    const unit = st.attributes.temperature_unit || "°";
     const now = new Date();
     const fc = (this._forecast || []).slice(0, this._days);
 
@@ -376,9 +463,9 @@ class WeatherGlassCard extends HTMLElement {
       return `<div class="row">
         <div class="day">${i === 0 ? "Heute" : DAYS_SHORT[dt.getDay()] + "."}</div>
         ${mini(d.condition)}
-        <div class="lo">${min != null ? min + "\u00b0" : "-"}</div>
+        <div class="lo">${min != null ? min + "°" : "-"}</div>
         <div class="track"><div style="left:${left.toFixed(1)}%;width:${Math.max(width, 4).toFixed(1)}%"></div></div>
-        <div class="hi">${max != null ? max + "\u00b0" : "-"}</div>
+        <div class="hi">${max != null ? max + "°" : "-"}</div>
       </div>`;
     }).join("");
 
@@ -388,16 +475,19 @@ class WeatherGlassCard extends HTMLElement {
           <div class="loc">${this._config.name || st.attributes.friendly_name || this._config.entity}</div>
           ${this._showClock ? `<div class="date">${DAYS[now.getDay()]}, ${now.getDate()}. ${MONTHS[now.getMonth()]}</div>` : ""}
         </div>
-        ${this._showClock ? `<div><div class="clock"></div></div>` : ""}
+        <div class="top-right">
+          <div class="warn-slots"></div>
+          ${this._showClock ? `<div class="clock"></div>` : ""}
+        </div>
       </div>
       <div class="hero">
         <div>
-          <div class="tempRow"><b>${st.attributes.temperature != null ? Math.round(st.attributes.temperature) : "-"}</b><i>${unit.replace("C", "").replace("F", "") || "\u00b0"}</i></div>
+          <div class="tempRow"><b>${st.attributes.temperature != null ? Math.round(st.attributes.temperature) : "-"}</b><i>${unit.replace("C", "").replace("F", "") || "°"}</i></div>
           <div class="cond">${LABELS[state] || state}</div>
           <div class="hl">
-            ${hi != null ? `<span>H ${hi}\u00b0</span>` : ""}
+            ${hi != null ? `<span>H ${hi}°</span>` : ""}
             ${hi != null && lo != null ? '<span class="sep"></span>' : ""}
-            ${lo != null ? `<span>T ${lo}\u00b0</span>` : ""}
+            ${lo != null ? `<span>T ${lo}°</span>` : ""}
             ${st.attributes.humidity != null ? `<span class="sep"></span><span>${st.attributes.humidity}%</span>` : ""}
           </div>
         </div>
@@ -410,10 +500,12 @@ class WeatherGlassCard extends HTMLElement {
         </div>
       </div>
       <div class="rule"></div>
-      <div class="rows">${rows || '<div class="err" style="padding:4px 8px;color:rgba(255,255,255,.45)">Keine Vorhersage verf\u00fcgbar.</div>'}</div>
+      <div class="rows">${rows || '<div class="err" style="padding:4px 8px;color:rgba(255,255,255,.45)">Keine Vorhersage verfügbar.</div>'}</div>
     `;
     this._clockEl = this._inner.querySelector(".clock");
     this._renderClock();
+    const warnSlots = this._inner.querySelector(".warn-slots");
+    if (warnSlots) for (const b of this._warnBadges) warnSlots.appendChild(b.el);
     if (this._anim) this._startCanvas();
   }
 }
