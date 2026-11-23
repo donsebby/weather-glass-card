@@ -15,7 +15,7 @@
  * type: custom:weather-glass-card
  * MIT
  */
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.3.0";
 
 const DAYS = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 const DAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
