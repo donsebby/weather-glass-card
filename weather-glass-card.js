@@ -15,7 +15,7 @@
  * type: custom:weather-glass-card
  * MIT
  */
-const CARD_VERSION = "1.3.0";
+const CARD_VERSION = "1.3.1";
 
 const DAYS = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 const DAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
@@ -205,12 +205,12 @@ class WeatherGlassCard extends HTMLElement {
     const style = document.createElement("style");
     style.textContent = `
       :host { display:block; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
-      .card { position:relative; border-radius:22px; overflow:hidden; cursor:pointer;
+      .card { position:relative; border-radius:var(--lg-radius, 22px); overflow:hidden; cursor:pointer;
         background:${WeatherGlassCard._shade(this._panelShade, 0.3, 0.6)};
         border:1px solid rgba(255,255,255,0.10);
         box-shadow:0 20px 40px -20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
-        backdrop-filter:blur(${this._blur}px) saturate(180%);
-        -webkit-backdrop-filter:blur(${this._blur}px) saturate(180%); }
+        backdrop-filter:${this._config.blur != null ? `blur(${this._blur}px) saturate(180%)` : `var(--lg-backdrop, blur(${this._blur}px) saturate(180%))`};
+        -webkit-backdrop-filter:${this._config.blur != null ? `blur(${this._blur}px) saturate(180%)` : `var(--lg-backdrop, blur(${this._blur}px) saturate(180%))`}; }
       .tint { position:absolute; inset:0; pointer-events:none; transition:background 700ms ease; }
       .sheen { position:absolute; inset:0; pointer-events:none;
         background:linear-gradient(155deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 28%, transparent 55%); }

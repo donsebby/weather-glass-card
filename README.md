@@ -97,6 +97,23 @@ Warning badges (`warning_entity` / `warnings`) are for alerts you want to visual
 
 The UV and pollen chips are everyday info, not alerts, so they render as plain chips in the info row underneath the temperature instead — no pulsing. The pollen chip is the one exception: once its Gefahrenindex reaches "Mittel" (2) or higher it gets a small inline warning-triangle, without turning into a separate pulsing badge.
 
+## Theme variables
+
+Like the other Liquid Glass cards, this card reads two optional CSS variables, so one theme can align all of them:
+
+```yaml
+# in your Home Assistant theme
+lg-radius: 22px                          # corner radius of the glass panel
+lg-backdrop: blur(22px) saturate(180%)   # blur/saturation behind the panel
+```
+
+Without them nothing changes. Options set on the card itself (e.g. `blur`) still win.
+
+## Changelog
+
+### 1.3.1
+- Reads the optional theme variables `--lg-radius` and `--lg-backdrop` (see *Theme variables*).
+
 ## License
 
 MIT
