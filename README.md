@@ -17,6 +17,7 @@ A frosted-glass ("Liquid Glass") weather widget for Home Assistant Lovelace dash
 - **New:** a UV-index chip, read directly off the weather entity's `uv_index` attribute
 - **New:** a pollen chip showing the strongest currently-active pollen type (Pollenflug-style Gefahrenindex, 0–3 scale), with an inline warning-triangle once the index reaches "Mittel" (2) or higher
 - UV/pollen chips are tappable and navigate to their own pop-up instead of the card's default more-info dialog
+- Optional calm solid look (`look: solid`) for dashboards with their own animated background
 
 ## Installation
 
@@ -49,6 +50,7 @@ A frosted-glass ("Liquid Glass") weather widget for Home Assistant Lovelace dash
 | `animations`       | boolean | `true`                 | Enable the animated canvas weather scene                                     |
 | `blur`             | number  | `20`                   | Backdrop blur in px                                                          |
 | `panel_shade`      | number  | `6`                    | Panel brightness; positive = lighter/whiter, negative = darker (-100–100)    |
+| `look`             | string  | `glass`                | `solid` switches to a calm solid panel without blur, gradients or animations, see *Solid look* |
 | `show_uv`          | boolean | `true`                 | Show the UV-index chip (reads `uv_index` off the weather entity)             |
 | `uv_navigate`      | string  | `#uv-popup`            | Hash/path the UV chip navigates to on tap                                    |
 | `pollen_entities`  | list    | `[]`                   | `[{entity, label}, ...]` sensors the pollen chip picks its "strongest active type" from |
@@ -87,6 +89,25 @@ pollen_entities:
     label: Grass
 ```
 
+## Solid look
+
+`look: solid` replaces the frosted glass with a calm, solid panel — meant for dashboards whose page background already shows an animated sky, so the card itself stays still:
+
+- **Panel:** solid surface (`--surface`, default the theme's card colour at 88 %), a thin 1 px edge, `--lg-radius` corners (default 20 px), no blur, no tint/sheen gradients, no shadow. `blur` and `panel_shade` have no effect.
+- **No animations inside the card:** no canvas rain/snow/fog/lightning (whatever `animations` says) and the scene and forecast icons keep still. The icons stay, drawn in flat colours without gradients or glows.
+- **Chips and forecast:** UV/pollen chips and the forecast list sit on solid inner tiles (`--lg-tile-bg`); the pollen chip is tinted orange from "Mittel" on. Temperature bars are a single neutral colour.
+- **Warning badges** are filled with their colour (dark icon), still pulsing while active.
+- Larger, easier-to-read text (nothing below 13 px); colours follow `--primary-text-color` / `--secondary-text-color`.
+- `prefers-reduced-motion` is respected.
+
+```yaml
+type: custom:weather-glass-card
+entity: weather.forecast_home
+look: solid
+```
+
+The visual editor offers it as *Stil: Glas / Solide*.
+
 ## Notes on day/night icons
 
 Some weather integrations never emit night-specific conditions (e.g. `sunny` both day and night). This card checks `sun.sun` and swaps the icon/tint to a night variant (moon instead of sun) when the sun is below the horizon, while leaving the text label unchanged so it still reflects exactly what the entity reports.
@@ -110,6 +131,9 @@ lg-backdrop: blur(22px) saturate(180%)   # blur/saturation behind the panel
 Without them nothing changes. Options set on the card itself (e.g. `blur`) still win.
 
 ## Changelog
+
+### 1.4.0
+- New option `look: solid`: calm solid panel without blur, gradients, glows or animations, using the optional design tokens `--surface` and `--lg-tile-bg` (see *Solid look*). Without the option the card looks exactly as before.
 
 ### 1.3.1
 - Reads the optional theme variables `--lg-radius` and `--lg-backdrop` (see *Theme variables*).

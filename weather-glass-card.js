@@ -12,10 +12,13 @@
  * UV/pollen chips are tappable and navigate to their own popup (default
  * "#uv-popup" / "#pollen-popup") instead of the card's default more-info
  * action, so each can open a dedicated bubble-card pop-up with more detail.
+ * `look: solid` (opt-in) swaps the frosted glass for a calm solid panel
+ * without blur, gradients, glows or the canvas animation - for dashboards
+ * whose page background already shows an animated sky.
  * type: custom:weather-glass-card
  * MIT
  */
-const CARD_VERSION = "1.3.1";
+const CARD_VERSION = "1.4.0";
 
 const DAYS = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 const DAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
@@ -93,6 +96,7 @@ class WeatherGlassCard extends HTMLElement {
         { name: "animations", selector: { boolean: {} } },
         { name: "blur", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
         { name: "panel_shade", selector: { number: { min: -100, max: 100, step: 5, mode: "slider", unit_of_measurement: "%" } } },
+        { name: "look", selector: { select: { mode: "dropdown", options: [{ value: "glass", label: "Glas" }, { value: "solid", label: "Solide" }] } } },
         { name: "show_uv", selector: { boolean: {} } },
         { name: "uv_navigate", selector: { text: {} } },
         { name: "pollen_navigate", selector: { text: {} } },
@@ -117,6 +121,7 @@ class WeatherGlassCard extends HTMLElement {
         animations: "Animated weather scene",
         blur: "Backdrop blur",
         panel_shade: "Panel brightness",
+        look: "Stil",
         show_uv: "Show UV index chip",
         uv_navigate: "UV chip tap navigation path",
         pollen_navigate: "Pollen chip tap navigation path",
@@ -133,7 +138,11 @@ class WeatherGlassCard extends HTMLElement {
     this._config = config;
     this._days = Math.max(3, Math.min(7, config.days ?? 5));
     this._showClock = config.show_clock !== false;
-    this._anim = config.animations !== false;
+    // look: solid is opt-in; anything else keeps the glass look untouched.
+    // The solid look stays calm: no canvas rain/snow/fog and no moving
+    // icons (the page behind already shows the animated sky).
+    this._solid = config.look === "solid";
+    this._anim = config.animations !== false && !this._solid;
     this._blur = config.blur ?? 20;
     this._panelShade = config.panel_shade ?? 6;
     this._showUv = config.show_uv !== false;
@@ -284,6 +293,51 @@ class WeatherGlassCard extends HTMLElement {
         box-shadow:0 4px 14px -4px color-mix(in srgb, var(--warn-badge-color,#ff9800) 65%, transparent);
         animation:wgc-warn-pulse 1.4s ease-in-out infinite; }
       .warn-badge ha-icon { --mdc-icon-size:17px; color:var(--warn-badge-color,#ff9800); }
+      /* look: solid - calm solid panel instead of frosted glass: no blur,
+         no tint/sheen gradients, no glows or soft shadows, flat icons that
+         keep still. Colours come from the page's design tokens (--surface,
+         --lg-tile-bg, text colours) with fallbacks. Only applies with the
+         .solid class, the glass rules above stay untouched. */
+      .card.solid { background:var(--surface, color-mix(in srgb, var(--card-background-color, #1c1f28) 88%, transparent));
+        border:1px solid rgba(255,255,255,0.06); border-radius:var(--lg-radius, 20px); box-shadow:none;
+        backdrop-filter:none; -webkit-backdrop-filter:none; }
+      .card.solid .tint, .card.solid .sheen { display:none; }
+      .card.solid .inner { padding:16px; }
+      .card.solid .loc { font-size:15px; font-weight:600; }
+      .card.solid .date { color:var(--secondary-text-color, rgba(255,255,255,.6)); font-size:13px; font-weight:400; }
+      .card.solid .cond { color:var(--primary-text-color,#fff); font-size:15px; font-weight:400; }
+      .card.solid .hl { color:var(--secondary-text-color, rgba(255,255,255,.6)); font-size:13px; font-weight:500; }
+      .card.solid .hl span.sep { background:color-mix(in srgb, var(--primary-text-color,#fff) 20%, transparent); }
+      .card.solid .chip { padding:6px 10px; background:var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent));
+        border:1px solid rgba(255,255,255,0.04); border-radius:calc(var(--lg-radius, 20px) - 4px); }
+      .card.solid .chip:hover { background:color-mix(in srgb, var(--primary-text-color,#fff) 6%, var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent))); }
+      .card.solid .chip ha-icon { --mdc-icon-size:16px; color:var(--secondary-text-color, rgba(255,255,255,.6)); }
+      .card.solid .chip span { color:var(--primary-text-color,#fff); font-size:13px; font-weight:500; }
+      .card.solid .chip.chip-warn { background:color-mix(in srgb, #ff9f43 20%, var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent)));
+        border-color:rgba(255,255,255,0.04); }
+      .card.solid .chip-warn-icon { --mdc-icon-size:16px; }
+      .card.solid .scene *, .card.solid .mini * { animation:none; }
+      .card.solid .sun .halo { display:none; }
+      .card.solid .sun .disc, .card.solid .mini .s { background:#ffc857; box-shadow:none; }
+      .card.solid .moon, .card.solid .mini .s.moon-s { background:#dfe5f2; box-shadow:none; }
+      .card.solid .cloud .base, .card.solid .cloud .p1, .card.solid .cloud .p2,
+      .card.solid .mini .cb, .card.solid .mini .cp { background:#eef2f8; box-shadow:none; }
+      .card.solid .bolt { background:#ffd24d; filter:none; }
+      .card.solid .fog i { background:color-mix(in srgb, var(--primary-text-color,#fff) 45%, transparent); }
+      .card.solid .rule { display:none; }
+      .card.solid .rows { margin-top:16px; padding:4px; gap:0;
+        background:var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent));
+        border:1px solid rgba(255,255,255,0.04); border-radius:calc(var(--lg-radius, 20px) - 4px); }
+      .card.solid .row { grid-template-columns:56px 30px 40px 1fr 40px; padding:8px 10px; border-radius:calc(var(--lg-radius, 20px) - 8px); }
+      .card.solid .row:hover { background:color-mix(in srgb, var(--primary-text-color,#fff) 6%, transparent); }
+      .card.solid .row .day { color:var(--primary-text-color,#fff); font-size:15px; font-weight:500; }
+      .card.solid .row .lo { color:var(--secondary-text-color, rgba(255,255,255,.6)); font-size:15px; font-weight:500; }
+      .card.solid .row .hi { font-size:15px; font-weight:500; }
+      .card.solid .track { height:6px; background:color-mix(in srgb, var(--primary-text-color,#fff) 10%, transparent); }
+      .card.solid .track div { background:color-mix(in srgb, var(--primary-text-color,#fff) 60%, transparent); box-shadow:none; }
+      .card.solid .err { font-size:13px; }
+      .card.solid .warn-badge { width:36px; height:36px; background:var(--warn-badge-color,#ff9800); border:none; box-shadow:none; }
+      .card.solid .warn-badge ha-icon { --mdc-icon-size:20px; color:#16181d; }
       @keyframes wgc-halo { 0%,100%{ transform:scale(1); opacity:.55; } 50%{ transform:scale(1.14); opacity:.9; } }
       @keyframes wgc-drift { 0%{ transform:translateX(-6px);} 50%{ transform:translateX(6px);} 100%{ transform:translateX(-6px);} }
       @keyframes wgc-fall { 0%{ transform:translateY(-6px); opacity:0;} 25%{opacity:1;} 100%{ transform:translateY(20px); opacity:0;} }
@@ -292,11 +346,12 @@ class WeatherGlassCard extends HTMLElement {
       @keyframes wgc-fogline { 0%,100%{ transform:translateX(-8px); opacity:.35;} 50%{ transform:translateX(8px); opacity:.85;} }
       @keyframes wgc-warn-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.55; transform:scale(1.18); } }
       @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
+      @media (prefers-reduced-motion: reduce) { .card.solid .chip, .card.solid .row { transition:none; } }
     `;
     this.shadowRoot.appendChild(style);
 
     this._card = document.createElement("div");
-    this._card.className = "card";
+    this._card.className = "card" + (this._solid ? " solid" : "");
     this._card.innerHTML = `<div class="tint"></div><div class="sheen"></div>${this._anim ? '<canvas></canvas>' : ""}<div class="inner"></div>`;
     this._card.addEventListener("click", () => this.dispatchEvent(new CustomEvent("hass-more-info", {
       detail: { entityId: this._config.entity }, bubbles: true, composed: true
@@ -553,7 +608,7 @@ class WeatherGlassCard extends HTMLElement {
       const t = TRAITS[s] || TRAITS.cloudy;
       return `<div class="mini">
         ${t.sun ? '<div class="s"></div>' : ""}
-        ${t.moon ? '<div class="s" style="background:radial-gradient(circle at 36% 32%,#f3f6ff,#c3cee6 60%,#94a2c0);box-shadow:0 0 10px rgba(160,190,255,.5)"></div>' : ""}
+        ${t.moon ? (this._solid ? '<div class="s moon-s"></div>' : '<div class="s" style="background:radial-gradient(circle at 36% 32%,#f3f6ff,#c3cee6 60%,#94a2c0);box-shadow:0 0 10px rgba(160,190,255,.5)"></div>') : ""}
         ${t.cloud ? '<div class="cb"></div><div class="cp"></div>' : ""}
         ${t.rain && !t.bolt ? '<div class="d1"></div><div class="d2"></div>' : ""}
         ${t.snow ? '<div class="f1"></div><div class="f2"></div>' : ""}
