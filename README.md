@@ -50,7 +50,7 @@ A frosted-glass ("Liquid Glass") weather widget for Home Assistant Lovelace dash
 | `animations`       | boolean | `true`                 | Enable the animated canvas weather scene                                     |
 | `blur`             | number  | `20`                   | Backdrop blur in px                                                          |
 | `panel_shade`      | number  | `6`                    | Panel brightness; positive = lighter/whiter, negative = darker (-100–100)    |
-| `look`             | string  | `glass`                | `solid` switches to a calm solid panel without blur, gradients or animations, see *Solid look* |
+| `look`             | string  | theme / `glass`        | `solid` switches to a calm solid panel without blur, gradients or animations, `glass` forces glass; unset = theme's `lg-look`, see *Solid look* |
 | `show_uv`          | boolean | `true`                 | Show the UV-index chip (reads `uv_index` off the weather entity)             |
 | `uv_navigate`      | string  | `#uv-popup`            | Hash/path the UV chip navigates to on tap                                    |
 | `pollen_entities`  | list    | `[]`                   | `[{entity, label}, ...]` sensors the pollen chip picks its "strongest active type" from |
@@ -108,6 +108,13 @@ look: solid
 
 The visual editor offers it as *Stil: Glas / Solide*.
 
+The look can also come from your theme, for all Liquid Glass cards at once: set `lg-look: solid` in the Home Assistant theme (the CSS variable `--lg-look`, value `solid` or `glass`). `look:` on a single card overrides the theme; without either the card stays glass. The card picks up theme switches on its own.
+
+```yaml
+# in your Home Assistant theme
+lg-look: solid
+```
+
 ## Notes on day/night icons
 
 Some weather integrations never emit night-specific conditions (e.g. `sunny` both day and night). This card checks `sun.sun` and swaps the icon/tint to a night variant (moon instead of sun) when the sun is below the horizon, while leaving the text label unchanged so it still reflects exactly what the entity reports.
@@ -133,6 +140,7 @@ Without them nothing changes. Options set on the card itself (e.g. `blur`) still
 ## Changelog
 
 ### 1.4.0
+- The look can come from the theme: `lg-look: solid` (CSS variable `--lg-look`) switches all Liquid Glass cards to the solid look; `look:` on the card overrides it (see *Solid look*).
 - New option `look: solid`: calm solid panel without blur, gradients, glows or animations, using the optional design tokens `--surface` and `--lg-tile-bg` (see *Solid look*). Without the option the card looks exactly as before.
 
 ### 1.3.1
