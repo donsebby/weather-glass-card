@@ -15,6 +15,8 @@
  * `look: solid` (opt-in) swaps the frosted glass for a calm solid panel
  * without blur, gradients, glows or the canvas animation - for dashboards
  * whose page background already shows an animated sky.
+ * Without `look:` the theme decides via the CSS variable `--lg-look`
+ * (`solid` | `glass`, default glass).
  * type: custom:weather-glass-card-dev
  * MIT
  */
@@ -141,7 +143,9 @@ class WeatherGlassCard extends HTMLElement {
     // look: solid is opt-in; anything else keeps the glass look untouched.
     // The solid look stays calm: no canvas rain/snow/fog and no moving
     // icons (the page behind already shows the animated sky).
-    this._solid = config.look === "solid";
+    // `look:` in the config wins; otherwise the theme decides via the CSS
+    // variable --lg-look (see _effectiveLook / _checkLook).
+    this._solid = this._effectiveLook(config) === "solid";
     this._anim = config.animations !== false && !this._solid;
     this._blur = config.blur ?? 20;
     this._panelShade = config.panel_shade ?? 6;
@@ -179,10 +183,15 @@ class WeatherGlassCard extends HTMLElement {
       }
     }
     this._warnings = warnList;
+    // A rebuild throws the old canvas away: stop its loop/observer so the
+    // new canvas gets its own, and force a full re-render of the new DOM.
+    this._stopCanvas();
+    this._lastSig = null;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this.shadowRoot.innerHTML = "";
     this._build();
     if (this._hass) this._render();
+    if (this._anim && this.isConnected) this._startCanvas();
   }
 
   getCardSize() { return 6; }
@@ -190,18 +199,68 @@ class WeatherGlassCard extends HTMLElement {
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
+    // Theme switches arrive via hass.themes - only then re-read --lg-look
+    // (no getComputedStyle on every hass tick).
+    const th = hass && hass.themes;
+    const themeSig = th ? th.theme + "|" + th.darkMode : "";
+    if (th !== this._themesRef || themeSig !== this._themeSig) {
+      this._themesRef = th;
+      this._themeSig = themeSig;
+      this._scheduleLookCheck();
+    }
     if (first || this._forecastStale()) this._fetchForecast();
     this._render();
   }
 
   connectedCallback() {
     this._clock = setInterval(() => this._renderClock(), 1000);
+    if (!this._onThemeChanged) this._onThemeChanged = () => this._scheduleLookCheck();
+    window.addEventListener("lg-theme-changed", this._onThemeChanged);
+    this._scheduleLookCheck();
     if (this._anim) this._startCanvas();
   }
 
   disconnectedCallback() {
     clearInterval(this._clock);
+    if (this._onThemeChanged) window.removeEventListener("lg-theme-changed", this._onThemeChanged);
+    cancelAnimationFrame(this._lookRaf);
+    this._stopCanvas();
+  }
+
+  /* ---------- look (glass | solid) ---------- */
+
+  // Effective look: `look: solid|glass` in the config, else the theme's
+  // --lg-look variable on this element (quotes tolerated), else glass.
+  _effectiveLook(config) {
+    const own = config && config.look;
+    if (own === "solid" || own === "glass") return own;
+    let v = "";
+    try { v = getComputedStyle(this).getPropertyValue("--lg-look"); } catch (e) { v = ""; }
+    v = String(v || "").trim().replace(/^["']+|["']+$/g, "").trim().toLowerCase();
+    return v === "solid" ? "solid" : "glass";
+  }
+
+  // Re-read the theme now and once more on the next frame (the theme may
+  // only apply its variables after this element got connected / hass).
+  _scheduleLookCheck() {
+    this._checkLook();
+    cancelAnimationFrame(this._lookRaf);
+    this._lookRaf = requestAnimationFrame(() => this._checkLook());
+  }
+
+  _checkLook() {
+    const c = this._config;
+    if (!c || c.look === "solid" || c.look === "glass") return;
+    const solid = this._effectiveLook(c) === "solid";
+    // The DOM depends on the look (canvas, scene markup), so rebuild as if
+    // setConfig had run again with the same config.
+    if (solid !== this._solid) this.setConfig(c);
+  }
+
+  _stopCanvas() {
     cancelAnimationFrame(this._raf);
+    this._raf = null;
+    if (this._ro) { this._ro.disconnect(); this._ro = null; }
   }
 
   static _shade(v, maxWhite, maxBlack) {
@@ -444,7 +503,8 @@ class WeatherGlassCard extends HTMLElement {
       cv.width = Math.max(1, r.width * dpr); cv.height = Math.max(1, r.height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); this._w = r.width; this._h = r.height;
     };
-    new ResizeObserver(size).observe(cv);
+    this._ro = new ResizeObserver(size);
+    this._ro.observe(cv);
     size();
     const seed = (k) => {
       const w = this._w || 1, h = this._h || 1;
