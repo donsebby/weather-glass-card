@@ -139,6 +139,9 @@ Without them nothing changes. Options set on the card itself (e.g. `blur`) still
 
 ## Changelog
 
+### 1.5.1
+- Solid look: the panel reads its own variables (`--lg-panel-bg`, `--lg-panel-edge`, `--lg-panel-shadow`), so a theme can style panels inside pop-ups differently from cards on the page.
+
 ### 1.5.0
 - Solid look: the panel takes its fill from `--lg-tile-bg` when the theme sets it (glass solid look).
 - Solid look: the card's own panel takes edge, shadow and blur from the theme (`--lg-tile-edge`, `--lg-tile-shadow`, `--lg-panel-backdrop`).
