@@ -357,7 +357,7 @@ class WeatherGlassCard extends HTMLElement {
          keep still. Colours come from the page's design tokens (--surface,
          --lg-tile-bg, text colours) with fallbacks. Only applies with the
          .solid class, the glass rules above stay untouched. */
-      .card.solid { background:var(--surface, color-mix(in srgb, var(--card-background-color, #1c1f28) 88%, transparent));
+      .card.solid { background:var(--lg-tile-bg, var(--surface, color-mix(in srgb, var(--card-background-color, #1c1f28) 88%, transparent)));
         border: var(--lg-tile-edge, 1px solid rgba(255,255,255,0.06)); border-radius:var(--lg-radius, 20px); box-shadow: var(--lg-tile-shadow, none);
         backdrop-filter: var(--lg-panel-backdrop, none); -webkit-backdrop-filter: var(--lg-panel-backdrop, none); }
       .card.solid .tint, .card.solid .sheen { display:none; }
