@@ -368,12 +368,11 @@ class WeatherGlassCard extends HTMLElement {
       .card.solid .hl { color:var(--secondary-text-color, rgba(255,255,255,.6)); font-size:13px; font-weight:500; }
       .card.solid .hl span.sep { background:color-mix(in srgb, var(--primary-text-color,#fff) 20%, transparent); }
       .card.solid .chip { padding:6px 10px; background:var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent));
-        border:1px solid rgba(255,255,255,0.04); border-radius:calc(var(--lg-radius, 20px) - 4px); }
+        border:var(--lg-tile-edge, 1px solid rgba(255,255,255,0.04)); box-shadow:var(--lg-tile-shadow, none); border-radius:calc(var(--lg-radius, 20px) - 4px); }
       .card.solid .chip:hover { background:color-mix(in srgb, var(--primary-text-color,#fff) 6%, var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent))); }
       .card.solid .chip ha-icon { --mdc-icon-size:16px; color:var(--secondary-text-color, rgba(255,255,255,.6)); }
       .card.solid .chip span { color:var(--primary-text-color,#fff); font-size:13px; font-weight:500; }
-      .card.solid .chip.chip-warn { background:color-mix(in srgb, #ff9f43 20%, var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent)));
-        border-color:rgba(255,255,255,0.04); }
+      .card.solid .chip.chip-warn { background:color-mix(in srgb, #ff9f43 20%, var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent))); }
       .card.solid .chip-warn-icon { --mdc-icon-size:16px; }
       .card.solid .scene *, .card.solid .mini * { animation:none; }
       .card.solid .sun .halo { display:none; }
@@ -386,7 +385,7 @@ class WeatherGlassCard extends HTMLElement {
       .card.solid .rule { display:none; }
       .card.solid .rows { margin-top:16px; padding:4px; gap:0;
         background:var(--lg-tile-bg, color-mix(in srgb, var(--primary-text-color,#fff) 8%, transparent));
-        border:1px solid rgba(255,255,255,0.04); border-radius:calc(var(--lg-radius, 20px) - 4px); }
+        border:var(--lg-tile-edge, 1px solid rgba(255,255,255,0.04)); box-shadow:var(--lg-tile-shadow, none); border-radius:calc(var(--lg-radius, 20px) - 4px); }
       .card.solid .row { grid-template-columns:56px 30px 40px 1fr 40px; padding:8px 10px; border-radius:calc(var(--lg-radius, 20px) - 8px); }
       .card.solid .row:hover { background:color-mix(in srgb, var(--primary-text-color,#fff) 6%, transparent); }
       .card.solid .row .day { color:var(--primary-text-color,#fff); font-size:15px; font-weight:500; }
