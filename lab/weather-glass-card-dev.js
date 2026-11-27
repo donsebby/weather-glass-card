@@ -20,7 +20,7 @@
  * type: custom:weather-glass-card-dev
  * MIT
  */
-const CARD_VERSION = "1.4.0-dev";
+const CARD_VERSION = "1.5.1-dev";
 
 const DAYS = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
 const DAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
@@ -357,8 +357,8 @@ class WeatherGlassCard extends HTMLElement {
          keep still. Colours come from the page's design tokens (--surface,
          --lg-tile-bg, text colours) with fallbacks. Only applies with the
          .solid class, the glass rules above stay untouched. */
-      .card.solid { background:var(--lg-tile-bg, var(--surface, color-mix(in srgb, var(--card-background-color, #1c1f28) 88%, transparent)));
-        border: var(--lg-tile-edge, 1px solid rgba(255,255,255,0.06)); border-radius:var(--lg-radius, 20px); box-shadow: var(--lg-tile-shadow, none);
+      .card.solid { background:var(--lg-panel-bg, var(--surface, color-mix(in srgb, var(--card-background-color, #1c1f28) 88%, transparent)));
+        border: var(--lg-panel-edge, 1px solid rgba(255,255,255,0.06)); border-radius:var(--lg-radius, 20px); box-shadow: var(--lg-panel-shadow, none);
         backdrop-filter: var(--lg-panel-backdrop, none); -webkit-backdrop-filter: var(--lg-panel-backdrop, none); }
       .card.solid .tint, .card.solid .sheen { display:none; }
       .card.solid .inner { padding:16px; }
